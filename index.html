@@ -1,1 +1,166 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8" /><title>Boult Dashboard</title><meta name="viewport" content="width=device-width, initial-scale=1.0" /><script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><link rel="stylesheet" href="style.css" /></head><body><div id="lock-screen"><div class="lock-card"><h1>Boult</h1><p>Secure parental monitoring</p><input type="password" id="lock-input" placeholder="Password" /><button id="unlock-btn">Unlock</button><p id="lock-error"></p></div></div><div id="app" class="hidden"><header class="top-bar"><h1>Boult Monitor</h1><button class="refresh-btn">Refresh</button></header><nav class="sidebar"><div class="logo">BOULT</div><button class="nav-btn active" data-target="dashboard">Dashboard</button><button class="nav-btn" data-target="call-logs">Calls</button><button class="nav-btn" data-target="locations">Location</button><button class="nav-btn" data-target="device-status">Device</button><button class="nav-btn" data-target="call-recordings">Recordings</button></nav><main class="main-content"><section id="dashboard" class="section active"><h2>Dashboard</h2><div class="stats-grid"><div class="stat-card"><div class="stat-icon">📞</div><div>Call Logs</div><div id="stat-calls">0</div></div><div class="stat-card"><div class="stat-icon">📍</div><div>Locations</div><div id="stat-locations">0</div></div><div class="stat-card"><div class="stat-icon">📱</div><div>Device</div><div id="stat-device">--</div></div><div class="stat-card"><div class="stat-icon">🔋</div><div>Battery</div><div id="stat-battery">0%</div></div></div></section><section id="call-logs" class="section"><h2>Call Logs</h2><div class="filter-row"><input type="date" id="calllogs-date" /><button id="calllogs-apply">Apply</button><button id="calllogs-clear">Clear</button><button id="calllogs-select">Select All</button><button id="calllogs-deselect">Deselect</button><button id="calllogs-delete" class="btn-danger">Delete Selected</button></div><table><thead><tr><th>Checkbox</th><th>Number</th><th>Type</th><th>Duration</th><th>Time</th><th>Action</th></tr></thead><tbody id="calllogs-body">Loading...</tbody></table></section><section id="locations" class="section"><h2>Location History</h2><div class="filter-row"><input type="date" id="locations-date" /><button id="locations-apply">Apply</button><button id="locations-clear">Clear</button><button id="locations-select">Select All</button><button id="locations-deselect">Deselect</button><button id="locations-delete" class="btn-danger">Delete</button></div><table><thead><tr><th>Checkbox</th><th>Lat</th><th>Lng</th><th>Time</th><th>Action</th></tr></thead><tbody id="locations-body">Loading...</tbody></table><div id="map" class="map"></div></section><section id="device-status" class="section"><h2>Device Status</h2><div class="filter-row"><input type="date" id="device-date" /><button id="device-apply">Apply</button><button id="device-clear">Clear</button></div><div id="device-container">Loading...</div></section><section id="call-recordings" class="section"><h2>Call Recordings</h2><div class="filter-row"><input type="date" id="recordings-date" /><button id="recordings-apply">Apply</button><button id="recordings-clear">Clear</button><button id="recordings-select">Select All</button><button id="recordings-deselect">Deselect</button><button id="recordings-delete" class="btn-danger">Delete</button></div><table><thead><tr><th>Checkbox</th><th>Number</th><th>Direction</th><th>Duration</th><th>Time</th><th>Actions</th></tr></thead><tbody id="recordings-body">Loading...</tbody></table></section></main></div><script src="main.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Boult Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <!-- Lock Screen -->
+    <div id="lock-screen">
+        <div class="lock-card">
+            <h1>Boult</h1>
+            <p>Secure parental monitoring</p>
+            <input type="password" id="lock-input" placeholder="Password" />
+            <button id="unlock-btn">Unlock</button>
+            <p id="lock-error"></p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="hidden">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <h1>Boult Monitor</h1>
+            <button class="refresh-btn">Refresh</button>
+        </header>
+
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">BOULT<br><small>Monitoring</small></div>
+            <button class="nav-btn tab-btn active" data-target="dashboard">🏠 Dashboard</button>
+            <button class="nav-btn tab-btn" data-target="call-logs">📞 Calls</button>
+            <button class="nav-btn tab-btn" data-target="locations">📍 Location</button>
+            <button class="nav-btn tab-btn" data-target="device-status">📱 Device</button>
+            <button class="nav-btn tab-btn" data-target="call-recordings">🎙️ Recordings</button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="section tab-section active">
+                <h2>Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📞</div>
+                        <div class="stat-label">Call Logs</div>
+                        <div class="stat-value" id="stat-calls">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📍</div>
+                        <div class="stat-label">Locations</div>
+                        <div class="stat-value" id="stat-locations">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📱</div>
+                        <div class="stat-label">Device Status</div>
+                        <div class="stat-value" id="stat-device">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔋</div>
+                        <div class="stat-label">Battery</div>
+                        <div class="stat-value" id="stat-battery">0%</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Call Logs Section -->
+            <section id="call-logs" class="section tab-section">
+                <h2>Call Logs</h2>
+                <div class="filter-row">
+                    <input type="date" id="calllogs-date-filter" placeholder="Filter by date" />
+                    <button id="calllogs-apply-filter" class="btn-primary">Apply Filter</button>
+                    <button id="calllogs-clear-filter" class="btn-secondary">Clear Filter</button>
+                    <button id="calllogs-select-all" class="btn-secondary">Select All</button>
+                    <button id="calllogs-deselect-all" class="btn-secondary">Deselect All</button>
+                    <button id="calllogs-delete-selected" class="btn-danger">Delete Selected</button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">✓</th>
+                            <th>Number</th>
+                            <th>Type</th>
+                            <th>Duration (s)</th>
+                            <th>Date & Time</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calllogs-body">Loading...</tbody>
+                </table>
+            </section>
+
+            <!-- Locations Section -->
+            <section id="locations" class="section tab-section">
+                <h2>Location History</h2>
+                <div class="filter-row">
+                    <input type="date" id="locations-date-filter" placeholder="Filter by date" />
+                    <button id="locations-apply-filter" class="btn-primary">Apply Filter</button>
+                    <button id="locations-clear-filter" class="btn-secondary">Clear Filter</button>
+                    <button id="locations-select-all" class="btn-secondary">Select All</button>
+                    <button id="locations-deselect-all" class="btn-secondary">Deselect All</button>
+                    <button id="locations-delete-selected" class="btn-danger">Delete Selected</button>
+                </div>
+                <div class="locations-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">✓</th>
+                                <th>Latitude</th>
+                                <th>Longitude</th>
+                                <th>Date & Time</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="locations-body">Loading...</tbody>
+                    </table>
+                </div>
+                <div id="map" class="map"></div>
+            </section>
+
+            <!-- Device Status Section -->
+            <section id="device-status" class="section tab-section">
+                <h2>Device Status</h2>
+                <div class="filter-row">
+                    <input type="date" id="devicestatus-date-filter" placeholder="Filter by date" />
+                    <button id="devicestatus-apply-filter" class="btn-primary">Apply Filter</button>
+                    <button id="devicestatus-clear-filter" class="btn-secondary">Clear Filter</button>
+                </div>
+                <div id="devicestatus-container" class="device-grid">Loading...</div>
+            </section>
+
+            <!-- Call Recordings Section -->
+            <section id="call-recordings" class="section tab-section">
+                <h2>Call Recordings</h2>
+                <div class="filter-row">
+                    <input type="date" id="recordings-date-filter" placeholder="Filter by date" />
+                    <button id="recordings-apply-filter" class="btn-primary">Apply Filter</button>
+                    <button id="recordings-clear-filter" class="btn-secondary">Clear Filter</button>
+                    <button id="recordings-select-all" class="btn-secondary">Select All</button>
+                    <button id="recordings-deselect-all" class="btn-secondary">Deselect All</button>
+                    <button id="recordings-delete-selected" class="btn-danger">Delete Selected</button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">✓</th>
+                            <th>Number</th>
+                            <th>Direction</th>
+                            <th>Duration (s)</th>
+                            <th>Date & Time</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordings-body">Loading...</tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
