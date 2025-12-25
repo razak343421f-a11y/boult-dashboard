@@ -8,118 +8,253 @@ const COLLECTION_DEVICESTATUS='device_status';
 const COLLECTION_RECORDINGS='recordings';
 const BUCKET_ID='your_storage_bucket_id_here';
 const LOCK_PASSWORD='343421';
+
 const client=new Appwrite.Client().setEndpoint(APPWRITE_ENDPOINT).setProject(APPWRITE_PROJECT);
 const databases=new Appwrite.Databases(client);
+console.log('Appwrite initialized');
+
 function buildDateQuery(dateStr,attributeName){
  if(!dateStr)return[];
  const start=new Date(dateStr),end=new Date(dateStr);
  end.setHours(23,59,59,999);
  return[Appwrite.Query.greaterThanEqual(attributeName,start.toISOString()),Appwrite.Query.lessThanEqual(attributeName,end.toISOString())];
 }
+
 function formatDateTime(iso){
  if(!iso)return'-';
  const d=new Date(iso);
  return d.toLocaleDateString()+' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
+
 const lockScreen=document.getElementById('lock-screen'),lockInput=document.getElementById('lock-input'),unlockBtn=document.getElementById('unlock-btn'),lockError=document.getElementById('lock-error'),appRoot=document.getElementById('app');
+
 unlockBtn.addEventListener('click',()=>{
- if(lockInput.value===LOCK_PASSWORD){lockScreen.classList.add('hidden');appRoot.classList.remove('hidden');loadAllSections();}else{lockError.textContent='Incorrect password. Try again.';}
+ if(lockInput.value===LOCK_PASSWORD){
+ lockScreen.classList.add('hidden');
+ appRoot.classList.remove('hidden');
+ loadAllSections();
+ }else{
+ lockError.textContent='Incorrect password. Try again.';
+ }
 });
+
 lockInput.addEventListener('keyup',e=>{if(e.key==='Enter')unlockBtn.click();});
-document.querySelectorAll('.tab-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));btn.classList.add('active');document.getElementById(btn.dataset.target).classList.add('active');});});
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+ btn.addEventListener('click',()=>{
+ document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+ document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
+ btn.classList.add('active');
+ document.getElementById(btn.dataset.target).classList.add('active');
+ });
+});
+
 const calllogsBody=document.getElementById('calllogs-body');
+
 async function loadCallLogs(){
- const date=document.getElementById('calllogs-date-filter').value,queries=buildDateQuery(date,'createdAt');
- try{console.log('Loading call logs');const res=await databases.listDocuments(DATABASE_ID,COLLECTION_CALLLOGS,queries);console.log('Call logs:',res.documents);renderCallLogs(res.documents);}catch(e){console.error('Error:',e);renderCallLogs([]);}
+ try{
+ const date=document.getElementById('calllogs-date-filter').value;
+ const queries=buildDateQuery(date,'createdAt');
+ console.log('Loading call logs with date:',date,'queries:',queries);
+ const res=await databases.listDocuments(DATABASE_ID,COLLECTION_CALLLOGS,queries);
+ console.log('Call logs response:',res);
+ renderCallLogs(res.documents);
+ }catch(e){
+ console.error('Error loading call logs:',e);
+ renderCallLogs([]);
+ }
 }
+
 function renderCallLogs(items){
+ console.log('Rendering',items.length,'call logs');
  calllogsBody.innerHTML='';
- items.forEach(doc=>{const tr=document.createElement('tr');tr.innerHTML=`<td><input type='checkbox' class='table-checkbox calllogs-select' data-id='${doc.$id}'/></td><td>${doc.number||'-'}</td><td>${doc.type||'-'}</td><td>${doc.duration||0}</td><td>${formatDateTime(doc.createdAt)}</td><td><button class='action-btn danger' data-delete-calllog='${doc.$id}'>Delete</button></td>`;calllogsBody.appendChild(tr);});
+ items.forEach(doc=>{
+ const tr=document.createElement('tr');
+ tr.innerHTML=`<td><input type='checkbox' class='table-checkbox calllogs-select' data-id='${doc.$id}'/></td><td>${doc.number||'-'}</td><td>${doc.type||'-'}</td><td>${doc.duration||0}</td><td>${formatDateTime(doc.createdAt)}</td><td><button class='action-btn danger' data-delete-calllog='${doc.$id}'>Delete</button></td>`;
+ calllogsBody.appendChild(tr);
+ });
 }
+
 async function deleteCallLog(id){
- try{await databases.deleteDocument(DATABASE_ID,COLLECTION_CALLLOGS,id);loadCallLogs();}catch(e){console.error('Delete failed:',e);alert('Delete failed');}
+ try{
+ await databases.deleteDocument(DATABASE_ID,COLLECTION_CALLLOGS,id);
+ loadCallLogs();
+ }catch(e){
+ console.error('Delete failed:',e);
+ alert('Delete failed');
+ }
 }
+
 async function deleteSelectedCallLogs(){
  const ids=Array.from(document.querySelectorAll('.calllogs-select:checked')).map(c=>c.dataset.id);
- await Promise.all(ids.map(id=>databases.deleteDocument(DATABASE_ID,COLLECTION_CALLLOGS,id)));loadCallLogs();
+ await Promise.all(ids.map(id=>databases.deleteDocument(DATABASE_ID,COLLECTION_CALLLOGS,id)));
+ loadCallLogs();
 }
+
 document.getElementById('calllogs-apply-filter').addEventListener('click',loadCallLogs);
 document.getElementById('calllogs-clear-filter').addEventListener('click',()=>{document.getElementById('calllogs-date-filter').value='';loadCallLogs();});
 document.getElementById('calllogs-select-all').addEventListener('click',()=>{document.querySelectorAll('.calllogs-select').forEach(c=>c.checked=true);});
 document.getElementById('calllogs-deselect-all').addEventListener('click',()=>{document.querySelectorAll('.calllogs-select').forEach(c=>c.checked=false);});
 document.getElementById('calllogs-delete-selected').addEventListener('click',deleteSelectedCallLogs);
 calllogsBody.addEventListener('click',e=>{const id=e.target.getAttribute('data-delete-calllog');if(id)deleteCallLog(id);});
+
 const locationsBody=document.getElementById('locations-body');
 let map,markersLayer;
+
 function initMap(){
  if(map)return;
  map=L.map('map').setView([20.5937,78.9629],4);
  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OpenStreetMap'}).addTo(map);
  markersLayer=L.layerGroup().addTo(map);
 }
+
 async function loadLocations(){
+ try{
  initMap();
- const date=document.getElementById('locations-date-filter').value,queries=buildDateQuery(date,'createdAt');
- try{console.log('Loading locations');const res=await databases.listDocuments(DATABASE_ID,COLLECTION_LOCATIONS,queries);console.log('Locations:',res.documents);renderLocations(res.documents);}catch(e){console.error('Error:',e);renderLocations([]);}
+ const date=document.getElementById('locations-date-filter').value;
+ const queries=buildDateQuery(date,'createdAt');
+ console.log('Loading locations with date:',date,'queries:',queries);
+ const res=await databases.listDocuments(DATABASE_ID,COLLECTION_LOCATIONS,queries);
+ console.log('Locations response:',res);
+ renderLocations(res.documents);
+ }catch(e){
+ console.error('Error loading locations:',e);
+ renderLocations([]);
+ }
 }
+
 function renderLocations(items){
- locationsBody.innerHTML='';markersLayer.clearLayers();
- items.forEach(doc=>{const lat=doc.lat??doc.latitude,lng=doc.lng??doc.longitude,tr=document.createElement('tr');tr.innerHTML=`<td><input type='checkbox' class='table-checkbox locations-select' data-id='${doc.$id}'/></td><td>${lat}</td><td>${lng}</td><td>${formatDateTime(doc.createdAt)}</td><td><button class='action-btn danger' data-delete-location='${doc.$id}'>Delete</button></td>`;locationsBody.appendChild(tr);if(typeof lat==='number'&&typeof lng==='number'){const marker=L.marker([lat,lng]).addTo(markersLayer);marker.bindPopup(`<b>Location</b><br>${lat}, ${lng}<br>${formatDateTime(doc.createdAt)}`);}});
- if(items.length>0){const bounds=markersLayer.getBounds();if(bounds.isValid())map.fitBounds(bounds,{padding:[20,20]});}
+ console.log('Rendering',items.length,'locations');
+ locationsBody.innerHTML='';
+ markersLayer.clearLayers();
+ items.forEach(doc=>{
+ const lat=doc.lat??doc.latitude,lng=doc.lng??doc.longitude;
+ const tr=document.createElement('tr');
+ tr.innerHTML=`<td><input type='checkbox' class='table-checkbox locations-select' data-id='${doc.$id}'/></td><td>${lat}</td><td>${lng}</td><td>${formatDateTime(doc.createdAt)}</td><td><button class='action-btn danger' data-delete-location='${doc.$id}'>Delete</button></td>`;
+ locationsBody.appendChild(tr);
+ if(typeof lat==='number'&&typeof lng==='number'){
+ const marker=L.marker([lat,lng]).addTo(markersLayer);
+ marker.bindPopup(`<b>Location</b><br>${lat}, ${lng}<br>${formatDateTime(doc.createdAt)}`);
+ }
+ });
+ if(items.length>0){
+ const bounds=markersLayer.getBounds();
+ if(bounds.isValid())map.fitBounds(bounds,{padding:[20,20]});
+ }
 }
+
 async function deleteLocation(id){
- try{await databases.deleteDocument(DATABASE_ID,COLLECTION_LOCATIONS,id);loadLocations();}catch(e){console.error('Error:',e);}
+ try{
+ await databases.deleteDocument(DATABASE_ID,COLLECTION_LOCATIONS,id);
+ loadLocations();
+ }catch(e){
+ console.error('Error:',e);
+ }
 }
+
 async function deleteSelectedLocations(){
  const ids=Array.from(document.querySelectorAll('.locations-select:checked')).map(c=>c.dataset.id);
- await Promise.all(ids.map(id=>databases.deleteDocument(DATABASE_ID,COLLECTION_LOCATIONS,id)));loadLocations();
+ await Promise.all(ids.map(id=>databases.deleteDocument(DATABASE_ID,COLLECTION_LOCATIONS,id)));
+ loadLocations();
 }
+
 document.getElementById('locations-apply-filter').addEventListener('click',loadLocations);
 document.getElementById('locations-clear-filter').addEventListener('click',()=>{document.getElementById('locations-date-filter').value='';loadLocations();});
 document.getElementById('locations-select-all').addEventListener('click',()=>{document.querySelectorAll('.locations-select').forEach(c=>c.checked=true);});
 document.getElementById('locations-deselect-all').addEventListener('click',()=>{document.querySelectorAll('.locations-select').forEach(c=>c.checked=false);});
 document.getElementById('locations-delete-selected').addEventListener('click',deleteSelectedLocations);
 locationsBody.addEventListener('click',e=>{const id=e.target.getAttribute('data-delete-location');if(id)deleteLocation(id);});
+
 const devStatusContainer=document.getElementById('devicestatus-container');
+
 async function loadDeviceStatus(){
- const date=document.getElementById('devicestatus-date-filter').value,queries=buildDateQuery(date,'createdAt');
- try{console.log('Loading device status');const res=await databases.listDocuments(DATABASE_ID,COLLECTION_DEVICESTATUS,queries);console.log('Device status:',res.documents);renderDeviceStatus(res.documents);}catch(e){console.error('Error:',e);renderDeviceStatus([]);}
+ try{
+ const date=document.getElementById('devicestatus-date-filter').value;
+ const queries=buildDateQuery(date,'createdAt');
+ console.log('Loading device status');
+ const res=await databases.listDocuments(DATABASE_ID,COLLECTION_DEVICESTATUS,queries);
+ console.log('Device status response:',res);
+ renderDeviceStatus(res.documents);
+ }catch(e){
+ console.error('Error loading device status:',e);
+ renderDeviceStatus([]);
+ }
 }
+
 function renderDeviceStatus(items){
+ console.log('Rendering',items.length,'devices');
  devStatusContainer.innerHTML='';
- items.forEach(doc=>{const card=document.createElement('div');card.className='device-card';card.innerHTML=`<div class='device-card-header'><span class='device-label'>${doc.deviceName||'Device'}</span><span class='device-chip'>${doc.isOnline?'Online':'Offline'}</span></div><div class='device-meta'>Battery: ${doc.battery??'-'}%<br/>Network: ${doc.networkType||'-'}<br/>Updated: ${formatDateTime(doc.createdAt)}</div>`;devStatusContainer.appendChild(card);});
+ items.forEach(doc=>{
+ const card=document.createElement('div');
+ card.className='device-card';
+ card.innerHTML=`<div class='device-card-header'><span class='device-label'>${doc.deviceName||'Device'}</span><span class='device-chip'>${doc.isOnline?'Online':'Offline'}</span></div><div class='device-meta'>Battery: ${doc.battery??'-'}%<br/>Network: ${doc.networkType||'-'}<br/>Updated: ${formatDateTime(doc.createdAt)}</div>`;
+ devStatusContainer.appendChild(card);
+ });
 }
+
 document.getElementById('devicestatus-apply-filter').addEventListener('click',loadDeviceStatus);
 document.getElementById('devicestatus-clear-filter').addEventListener('click',()=>{document.getElementById('devicestatus-date-filter').value='';loadDeviceStatus();});
+
 const recordingsBody=document.getElementById('recordings-body');
+
 async function loadRecordings(){
- const date=document.getElementById('recordings-date-filter').value,queries=buildDateQuery(date,'createdAt');
- try{console.log('Loading recordings');const res=await databases.listDocuments(DATABASE_ID,COLLECTION_RECORDINGS,queries);console.log('Recordings:',res.documents);renderRecordings(res.documents);}catch(e){console.error('Error:',e);renderRecordings([]);}
+ try{
+ const date=document.getElementById('recordings-date-filter').value;
+ const queries=buildDateQuery(date,'createdAt');
+ console.log('Loading recordings');
+ const res=await databases.listDocuments(DATABASE_ID,COLLECTION_RECORDINGS,queries);
+ console.log('Recordings response:',res);
+ renderRecordings(res.documents);
+ }catch(e){
+ console.error('Error loading recordings:',e);
+ renderRecordings([]);
+ }
 }
+
 function renderRecordings(items){
+ console.log('Rendering',items.length,'recordings');
  recordingsBody.innerHTML='';
- items.forEach(doc=>{const tr=document.createElement('tr');tr.innerHTML=`<td><input type='checkbox' class='table-checkbox recordings-select' data-id='${doc.$id}'/></td><td>${doc.number||'-'}</td><td>${doc.direction||'-'}</td><td>${doc.duration||0}</td><td>${formatDateTime(doc.createdAt)}</td><td><button class='action-btn' data-download-rec='${doc.fileId||''}'}>Download</button><button class='action-btn danger' data-delete-rec='${doc.$id}'>Delete</button></td>`;recordingsBody.appendChild(tr);});
+ items.forEach(doc=>{
+ const tr=document.createElement('tr');
+ tr.innerHTML=`<td><input type='checkbox' class='table-checkbox recordings-select' data-id='${doc.$id}'/></td><td>${doc.number||'-'}</td><td>${doc.direction||'-'}</td><td>${doc.duration||0}</td><td>${formatDateTime(doc.createdAt)}</td><td><button class='action-btn' data-download-rec='${doc.fileId||''}'}>Download</button><button class='action-btn danger' data-delete-rec='${doc.$id}'>Delete</button></td>`;
+ recordingsBody.appendChild(tr);
+ });
 }
+
 async function deleteRecording(id){
- try{await databases.deleteDocument(DATABASE_ID,COLLECTION_RECORDINGS,id);loadRecordings();}catch(e){console.error('Error:',e);}
+ try{
+ await databases.deleteDocument(DATABASE_ID,COLLECTION_RECORDINGS,id);
+ loadRecordings();
+ }catch(e){
+ console.error('Error:',e);
+ }
 }
+
 async function deleteSelectedRecordings(){
  const ids=Array.from(document.querySelectorAll('.recordings-select:checked')).map(c=>c.dataset.id);
- await Promise.all(ids.map(id=>databases.deleteDocument(DATABASE_ID,COLLECTION_RECORDINGS,id)));loadRecordings();
+ await Promise.all(ids.map(id=>databases.deleteDocument(DATABASE_ID,COLLECTION_RECORDINGS,id)));
+ loadRecordings();
 }
+
 function downloadRecording(fileId){
  if(!fileId)return;
  const url=`${APPWRITE_ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/download?project=${APPWRITE_PROJECT}`;
  window.open(url,'_blank');
 }
+
 document.getElementById('recordings-apply-filter').addEventListener('click',loadRecordings);
 document.getElementById('recordings-clear-filter').addEventListener('click',()=>{document.getElementById('recordings-date-filter').value='';loadRecordings();});
 document.getElementById('recordings-select-all').addEventListener('click',()=>{document.querySelectorAll('.recordings-select').forEach(c=>c.checked=true);});
 document.getElementById('recordings-deselect-all').addEventListener('click',()=>{document.querySelectorAll('.recordings-select').forEach(c=>c.checked=false);});
 document.getElementById('recordings-delete-selected').addEventListener('click',deleteSelectedRecordings);
 recordingsBody.addEventListener('click',e=>{const deleteId=e.target.getAttribute('data-delete-rec'),fileId=e.target.getAttribute('data-download-rec');if(deleteId)deleteRecording(deleteId);if(fileId)downloadRecording(fileId);});
+
 document.querySelector('.refresh-btn').addEventListener('click',loadAllSections);
+
 function loadAllSections(){
  console.log('Loading all sections...');
- loadCallLogs();loadLocations();loadDeviceStatus();loadRecordings();
+ loadCallLogs();
+ loadLocations();
+ loadDeviceStatus();
+ loadRecordings();
 }
